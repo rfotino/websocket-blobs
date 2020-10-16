@@ -1,0 +1,14 @@
+{
+  "name": "agar",
+  "version": "1.0.0",
+  "description": "Multiplayer browser game using websockets.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Robert Fotino",
+  "license": "MIT",
+  "dependencies": {
+    "websocket": "^1.0.32"
+  }
+}
