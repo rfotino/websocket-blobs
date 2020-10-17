@@ -17,8 +17,19 @@ socket.onmessage = function(event) {
   case 'error':
     alert(message.reason);
     break;
-  case 'update':
+  case 'spawn':
     serverGameState = message.state;
+    break;
+  case 'update':
+    serverGameState.playerId = message.state.playerId;
+    serverGameState.players = message.state.players;
+    serverGameState.worldBounds = message.state.worldBounds;
+    for (const foodId in message.state.addedFood) {
+      serverGameState.foodParticles[foodId] = message.state.addedFood[foodId];
+    }
+    for (const foodId of message.state.removedFood) {
+      delete serverGameState.foodParticles[foodId];
+    }
     break;
   }
 };

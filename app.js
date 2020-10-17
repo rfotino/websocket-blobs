@@ -1,6 +1,5 @@
 const http = require('http');
 const websocket = require('websocket');
-const zlib = require('zlib');
 const Player = require('./player.js');
 
 const FOOD_RADIUS = 5;
@@ -34,6 +33,16 @@ wsServer = new websocket.server({
 let nextPlayerId = 1, nextFoodId = 1;
 let numPlayers = 0, numFood = 0;
 const players = {}, foodParticles = {};
+
+// Get player state to serialize to the client. We do this in multiple
+// places so it's made into a function here
+function getPlayerStates() {
+  const playerStates = {};
+  for (const playerId in players) {
+    playerStates[playerId] = players[playerId].getObj();
+  }
+  return playerStates;
+}
 
 wsServer.on('connect', function(connection) {
   console.log((new Date()) + ' Accepted new connection');
@@ -96,9 +105,22 @@ wsServer.on('connect', function(connection) {
 
   // Add to players array so that we can update game state of all players,
   // and remove from array after connection has closed
-  players[nextPlayerId] = player;
+  const playerId = nextPlayerId;
+  players[playerId] = player;
   nextPlayerId++;
   numPlayers++;
+
+  // Send spawn info to client so that we can only send deltas after that
+  // to reduce bandwidth
+  connection.sendUTF(JSON.stringify({
+    type: 'spawn',
+    state: {
+      playerId,
+      players: getPlayerStates(),
+      foodParticles,
+      worldBounds: WORLD_BOUNDS,
+    },
+  }));
 });
 
 // Update game state with regular frequency and send updates to
@@ -109,17 +131,23 @@ function updateGame() {
   const deltaSeconds = Number(timeEnd - timeStart) / 1e9;
   timeStart = timeEnd;
 
-  // Spawn missing food
+  // Spawn missing food, save to "added food" object so that we can send that
+  // as a delta to the client
+  const addedFood = {};
   while (numFood < MAX_FOOD) {
-    foodParticles[nextFoodId] = {
-      x: (Math.random() * WORLD_BOUNDS.width) + WORLD_BOUNDS.x,
-      y: (Math.random() * WORLD_BOUNDS.height) + WORLD_BOUNDS.y,
+    const food = {
+      x: Math.floor((Math.random() * WORLD_BOUNDS.width) + WORLD_BOUNDS.x),
+      y: Math.floor((Math.random() * WORLD_BOUNDS.height) + WORLD_BOUNDS.y),
     };
+    foodParticles[nextFoodId] = food;
+    addedFood[nextFoodId] = food;
     nextFoodId++;
     numFood++;
   }
 
-  // Move players around, force within bounds, eat food
+  // Move players around, force within bounds, eat food. Save array of eaten
+  // food ids so we can send that delta to the client
+  const removedFood = [];
   for (const playerId in players) {
     const player = players[playerId];
     player.update(deltaSeconds);
@@ -133,6 +161,7 @@ function updateGame() {
       const deltaY = food.y - player.pos.y;
       if ((deltaX * deltaX) + (deltaY * deltaY) < player.r * player.r) {
 	player.eat(FOOD_RADIUS);
+	removedFood.push(foodId);
 	delete foodParticles[foodId];
 	numFood--;
       }
@@ -180,18 +209,15 @@ function updateGame() {
 
   // Report world state to clients. TODO: optimize this so
   // that it's not repeating serialization many times
-  const playerStates = {};
-  for (const playerId in players) {
-    playerStates[playerId] = players[playerId].getObj();
-  }
   for (const playerId in players) {
     const player = players[playerId];
     player.connection.sendUTF(JSON.stringify({
       type: 'update',
       state: {
 	playerId,
-	players: playerStates,
-	foodParticles,
+	players: getPlayerStates(),
+	addedFood,
+	removedFood,
 	worldBounds: WORLD_BOUNDS,
       }
     }));
