@@ -23,6 +23,7 @@ class Player {
     this.name = name;
     this.pos = pos;
     this.r = STARTING_RADIUS;
+    this.growToR = this.r;
     this.dir = {x: 0, y: 0};
   }
 
