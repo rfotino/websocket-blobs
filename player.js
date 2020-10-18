@@ -4,14 +4,26 @@
  */
 
 const MAX_GROWTH_RATE = 50; // Units per second we can grow at after eating
+const STARTING_RADIUS = 50;
 
 class Player {
   constructor(connection, pos) {
     this.connection = connection;
+    this.alive = false;
     this.pos = pos; // position
-    this.r = 50; // radius
+    this.r = STARTING_RADIUS; // radius
     this.growToR = this.r; // radius we are growing to
     this.dir = {x: 0, y: 0}; // direction
+    this.name = "";
+  }
+
+  // Spawn with name given by the user
+  spawn(name, pos) {
+    this.alive = true;
+    this.name = name;
+    this.pos = pos;
+    this.r = STARTING_RADIUS;
+    this.dir = {x: 0, y: 0};
   }
 
   // Set the new dir based on user input. It will be
@@ -64,8 +76,10 @@ class Player {
   // Used to get object for JSON serialization to the client
   getObj() {
     return {
+      name: this.name,
       pos: this.pos,
       r: this.r,
+      alive: this.alive,
     };
   }
 }

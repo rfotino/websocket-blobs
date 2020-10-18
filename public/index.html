@@ -12,10 +12,35 @@
 	  width: 100%;
 	  height: 100%;
       }
+      #start-game-container {
+	  position: fixed;
+	  top: 50%;
+	  left: 50%;
+	  transform: translate(-50%, -50%);
+	  z-index: 9999;
+	  background-color: #f7f7f7;
+	  border: 1px solid #666666;
+	  border-radius: 5px;
+	  padding: 1.25em;
+	  box-shadow: 3px 5px 10px #000000;
+	  display: none; /* default to not visible */
+      }
+      #start-game-message {
+	  font-family: sans-serif;
+	  padding-bottom: 0.5em;
+      }
     </style>
   </head>
   <body>
-    <canvas id="canvas" />
+    <canvas id="canvas"></canvas>
+    <div id="start-game-container">
+      <p id="start-game-message">Choose a name (optional) to begin.</p>
+      <!-- Use a form so that hit enter to submit is handled by the browser -->
+      <form onsubmit="return false;">
+	<input type="text" id="name-input" placeholder="Name" maxlength="25" />
+	<input type="submit" id="start-game-button" value="Play" />
+      </form>
+    </div>
     <script type="text/javascript" src="index.js"></script>
   </body>
 </html>

@@ -5,6 +5,7 @@ const Player = require('./player.js');
 const FOOD_RADIUS = 5;
 const MAX_PLAYERS = 100;
 const MAX_FOOD = 200;
+const MAX_NAME_LENGTH = 25;
 const UPDATE_FREQUENCY = 60; // times per second to update
 const WORLD_BOUNDS = {
   x: 0,
@@ -44,6 +45,15 @@ function getPlayerStates() {
   return playerStates;
 }
 
+// TODO: Update this to take into account position of other players and
+// spawn further away from them
+function getSpawnPosition() {
+  return {
+    x: Math.random() * (WORLD_BOUNDS.width) + WORLD_BOUNDS.x,
+    y: Math.random() * (WORLD_BOUNDS.height) + WORLD_BOUNDS.y,
+  };
+}
+
 wsServer.on('connect', function(connection) {
   console.log((new Date()) + ' Accepted new connection');
 
@@ -61,12 +71,8 @@ wsServer.on('connect', function(connection) {
     return;
   }
 
-  // TODO: Choose a spawn location based on the location of other players
-  const spawnPosition = {
-    x: Math.random() * (WORLD_BOUNDS.width) + WORLD_BOUNDS.x,
-    y: Math.random() * (WORLD_BOUNDS.height) + WORLD_BOUNDS.y,
-  };
-  const player = new Player(connection, spawnPosition);
+  const initialPosition = getSpawnPosition();
+  const player = new Player(connection, initialPosition);
 
   // Listen for user inputs
   connection.on('message', function(message) {
@@ -89,6 +95,9 @@ wsServer.on('connect', function(connection) {
       case 'ping':
 	player.connection.sendUTF(JSON.stringify({type: 'pong'}));
 	break;
+      case 'spawn':
+	const truncatedName = deserialized.name.substring(0, MAX_NAME_LENGTH);
+	player.spawn(truncatedName, getSpawnPosition());
       }
     } catch(e) {
       console.log((new Date()) + ' Malformed message payload: ' + e);
@@ -113,7 +122,7 @@ wsServer.on('connect', function(connection) {
   // Send spawn info to client so that we can only send deltas after that
   // to reduce bandwidth
   connection.sendUTF(JSON.stringify({
-    type: 'spawn',
+    type: 'init',
     state: {
       playerId,
       players: getPlayerStates(),
@@ -150,6 +159,9 @@ function updateGame() {
   const removedFood = [];
   for (const playerId in players) {
     const player = players[playerId];
+    if (!player.alive) {
+      continue;
+    }
     player.update(deltaSeconds);
     player.pos.x = Math.max(player.pos.x, WORLD_BOUNDS.x + player.r);
     player.pos.x = Math.min(player.pos.x, WORLD_BOUNDS.x + WORLD_BOUNDS.width - player.r);
@@ -169,42 +181,28 @@ function updateGame() {
   }
 
   // Determine which players have been eaten, add their mass to other players
-  const eatenToEater = {};
   for (const eaterId in players) {
-    if (eatenToEater.hasOwnProperty(eaterId)) {
+    const eater = players[eaterId];
+    if (!eater.alive) {
       continue;
     }
-    const eater = players[eaterId];
     for (const eatenId in players) {
-      if (eaterId === eatenId || eatenToEater.hasOwnProperty(eatenId)) {
+      const eaten = players[eatenId];
+      if (eaterId === eatenId || !eaten.alive) {
 	continue;
       }
-      const eaten = players[eatenId];
       const dist = Math.sqrt(
 	Math.pow(eater.pos.x - eaten.pos.x, 2) +
 	Math.pow(eater.pos.y - eaten.pos.y, 2)
       );
       if (dist + eaten.r < eater.r) {
-	eatenToEater[eatenId] = eaterId;
+	eater.eat(eaten.r);
+	eaten.alive = false;
+	eaten.connection.sendUTF(JSON.stringify({
+	  type: 'dead',
+	}));
       }
     }
-  }
-
-  // Do the eating
-  for (const eatenId in eatenToEater) {
-    const eaterId = eatenToEater[eatenId];
-    const eaten = players[eatenId];
-    const eater = players[eaterId];
-    eater.eat(eaten.r);
-    eaten.connection.sendUTF(JSON.stringify({
-      type: 'error',
-      reason: 'You have been eliminated.',
-    }));
-    eaten.connection.close(
-      websocket.connection.CLOSE_REASON_NORMAL,
-      'You have been eliminated',
-    );
-    delete players[eatenId];
   }
 
   // Report world state to clients. TODO: optimize this so

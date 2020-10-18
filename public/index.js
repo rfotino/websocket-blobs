@@ -1,11 +1,33 @@
 const socket = new WebSocket('ws://localhost:8080');
 let serverGameState = null;
 
+const startGameContainer = document.getElementById('start-game-container');
+const startGameMessage = document.getElementById('start-game-message');
+const nameInput = document.getElementById('name-input');
+const startGameButton = document.getElementById('start-game-button');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Start game handler to send name and spawn request to the server
+startGameButton.addEventListener('click', function(event) {
+  if (socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+  socket.send(JSON.stringify({
+    type: 'spawn',
+    name: nameInput.value,
+  }));
+  startGameContainer.style.display = "none";
+});
+
 // Log some extra info about different socket events
 socket.onopen = function(event) {
+  startGameContainer.style.display = "block";
+  nameInput.focus();
   console.log('socket successfully opened');
 };
 socket.onclose = function(event) {
+  startGameContainer.style.display = "none";
   alert('Socket has been closed.');
   console.error('socket has been closed');
   console.error(event);
@@ -17,7 +39,7 @@ socket.onmessage = function(event) {
   case 'error':
     alert(message.reason);
     break;
-  case 'spawn':
+  case 'init':
     serverGameState = message.state;
     break;
   case 'update':
@@ -31,11 +53,12 @@ socket.onmessage = function(event) {
       delete serverGameState.foodParticles[foodId];
     }
     break;
+  case 'dead':
+    startGameContainer.style.display = "block";
+    startGameMessage.innerHTML = 'You have been eaten! Try again.';
+    break;
   }
 };
-
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
 
 // Input listeners to update direction sent to server
 const dir = {x: 0, y: 0};
@@ -72,6 +95,33 @@ function update() {
 
   // Update the server with the current client direction
   socket.send(JSON.stringify({type: 'move', dir}));
+}
+
+function drawPlayer(ctx, player) {
+  if (!player.alive) {
+    return;
+  }
+
+  ctx.save();
+
+  // Draw circle
+  ctx.fillStyle = '#9999ff';
+  ctx.strokeStyle = '#6666cc';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(player.pos.x, player.pos.y, player.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw name
+  const fontSize = player.r / 3;
+  ctx.font = fontSize + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#000000';
+  ctx.fillText(player.name, player.pos.x, player.pos.y);
+
+  ctx.restore();
 }
 
 function draw() {
@@ -132,26 +182,15 @@ function draw() {
   ctx.restore();
 
   // Draw players as blobs
-  ctx.save();
-  ctx.fillStyle = '#9999ff';
-  ctx.strokeStyle = '#6666cc';
-  ctx.lineWidth = 5;
   for (const playerId in serverGameState.players) {
     if (playerId === serverGameState.playerId) {
       continue;
     }
     const player = serverGameState.players[playerId];
-    ctx.beginPath();
-    ctx.arc(player.pos.x, player.pos.y, player.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    drawPlayer(ctx, player);
   }
   // Draw current player over any other players
-  ctx.beginPath();
-  ctx.arc(currentPlayer.pos.x, currentPlayer.pos.y, currentPlayer.r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  drawPlayer(ctx, currentPlayer);
 
   // Undo transform to center on current player so that we can draw UI components
   ctx.restore();
