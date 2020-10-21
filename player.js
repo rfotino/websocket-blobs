@@ -4,14 +4,19 @@
  */
 
 const MAX_GROWTH_RATE = 50; // Units per second we can grow at after eating
-const STARTING_RADIUS = 50;
+const MIN_RADIUS = 50;
+const MAX_RADIUS = 500;
+const SHRINK_RADIUS = 300; // Radius after which you begin to shrink
+const SHRINK_RATE = 3; // Radius/second that you shrink at after exceeding the above
+const MIN_SPEED = 50; // Units/second at maximum size
+const MAX_SPEED = 100; // Units/second at minumum size;
 
 class Player {
   constructor(connection, pos) {
     this.connection = connection;
     this.alive = false;
     this.pos = pos; // position
-    this.r = STARTING_RADIUS; // radius
+    this.r = MIN_RADIUS; // radius
     this.growToR = this.r; // radius we are growing to
     this.dir = {x: 0, y: 0}; // direction
     this.name = "";
@@ -22,7 +27,7 @@ class Player {
     this.alive = true;
     this.name = name;
     this.pos = pos;
-    this.r = STARTING_RADIUS;
+    this.r = MIN_RADIUS;
     this.growToR = this.r;
     this.dir = {x: 0, y: 0};
   }
@@ -44,22 +49,24 @@ class Player {
   }
 
   // Increase size from eating food or a player.
-  // TODO: adjust this to be nonlinear, radius should grow more slowly
-  // the larger it is
   eat(otherRadius) {
     const thisArea = Math.PI * this.r * this.r;
     const otherArea = Math.PI * otherRadius * otherRadius;
     const newArea = thisArea + otherArea;
     this.growToR = Math.sqrt(newArea / Math.PI);
+    this.growToR = Math.min(this.growToR, MAX_RADIUS);
   }
-
-
 
   // Gets max speed determined by the size of the player. This is
   // in game units per second
   getMaxSpeed() {
-    return 50;
-    //return 3000 / this.r; TODO: come up with better equation for slowing
+    return (
+      MIN_SPEED + (
+	(MAX_SPEED - MIN_SPEED) *
+	(MAX_RADIUS - this.r) /
+	(MAX_RADIUS - MIN_RADIUS)
+      )
+    );
   }
 
   // Update pos based on the current dir
@@ -71,6 +78,13 @@ class Player {
 
     if (this.r < this.growToR) {
       this.r = Math.min(this.growToR, this.r + (MAX_GROWTH_RATE * deltaSeconds));
+    }
+
+    if (this.r > SHRINK_RADIUS) {
+      const shrinkAmount =
+	    Math.min(this.r - SHRINK_RADIUS, SHRINK_RATE * deltaSeconds);
+      this.r -= shrinkAmount;
+      this.growToR -= shrinkAmount;
     }
   }
 

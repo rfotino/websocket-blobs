@@ -68,8 +68,8 @@ function updateDir(mousePos) {
     x: mousePos.x - (canvas.width / 2),
     y: mousePos.y - (canvas.height / 2),
   };
-  // Going halfway to the edge of the screen should be enough to apply max speed
-  const maxDist = Math.min(canvas.width, canvas.height) / 2;
+  // Going 1/3 from center to the edge of the screen will apply max speed
+  const maxDist = Math.min(canvas.width, canvas.height) / 3;
   // Apply scaling based on maxDist before sending to server. If the direction ends
   // up being more than a unit vector the server will do truncation, as it has to
   // prevent bad actors anyway

@@ -2,22 +2,22 @@ const http = require('http');
 const websocket = require('websocket');
 const Player = require('./player.js');
 
-const FOOD_RADIUS = 5;
-const MAX_PLAYERS = 100;
-const MAX_FOOD = 200;
+const FOOD_RADIUS = 6;
+const MAX_PLAYERS = 50;
+const MAX_FOOD = 750;
 const MAX_NAME_LENGTH = 25;
 const UPDATE_FREQUENCY = 60; // times per second to update
 const WORLD_BOUNDS = {
   x: 0,
   y: 0,
-  width: 2000,
-  height: 1200,
+  width: 3000,
+  height: 3000,
 };
 
 const server = http.createServer(function(request, response) {
   console.log((new Date()) + ' Received request for ' + request.url);
   response.writeHead(404);
-  response.end('cya');
+  response.end();
 });
 
 server.listen(8080, function() {
